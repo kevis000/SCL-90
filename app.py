@@ -544,6 +544,22 @@ elif st.session_state.page == "finish":
     surname = st.session_state.surname
     email = st.session_state.email
 
+    # Apsauga nuo pakartotinio siuntimo: jei šioje sesijoje jau siųsta,
+    # arba Google Sheets jau pažymėta "baigta" (pvz. po naršyklės atnaujinimo,
+    # kuris sukuria naują sesiją, bet Sheets įrašas išlieka), nebekartojam.
+    already_done = st.session_state.get("email_sent", False)
+    if not already_done:
+        try:
+            _, existing = find_progress(st.session_state.test_id)
+            if existing and existing.get("statusas") == "baigta":
+                already_done = True
+        except Exception:
+            pass  # jei Sheets nepasiekiamas, tęsiam įprastai (geriau parodyti nei blokuoti)
+
+    if already_done:
+        st.success("Testas baigtas, ačiū už atsakymus.")
+        st.stop()
+
     scores = calculate_scores(st.session_state.answers)
 
     # EXCEL
@@ -598,4 +614,5 @@ elif st.session_state.page == "finish":
         except Exception:
             pass  # klaidos pacientui nerodomos; jei reikia, žr. Google Sheets "statusas" stulpelį
 
+    st.session_state.email_sent = True
     st.stop()
