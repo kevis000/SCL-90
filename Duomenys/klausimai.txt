@@ -43,7 +43,7 @@ Raumenų skausmai
 Jausmas, kad jus stebi ar apie jus kalba kiti
 Sunku užmigti
 Būtinybė kelis kartus tikrinti tai, ką darote
-Sunku priimti sprendimus
+Sunkumas priimti sprendimus
 Baimė keliauti autobusais, metro ar traukiniais
 Sunku kvėpuoti
 Karščio ar šalčio priepuoliai
@@ -84,7 +84,7 @@ Jausmas, kad žmonės jumis pasinaudos, jei jiems leisite
 Mintys apie seksą, kurios labai trikdo
 Mintis, kad turėtumėte būti nubaustas už savo nuodėmes
 Jausmas, kad esate spaudžiamas viską atlikti
-Mintis, kad kažkas rimto negerai su jūsų kūnu
-Niekada nejaučiate artumo su kitu žmogumi
+Mintis, kad kažkas tikrai negerai su jūsų kūnu
+Jausmas, kad niekada nejaučiate artumo su kitu žmogumi
 Kaltės jausmas
 Mintis, kad kažkas negerai su jūsų protu
