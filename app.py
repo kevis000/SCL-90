@@ -37,10 +37,17 @@ from google.oauth2.service_account import Credentials
 # =========================
 # CONFIG — pakeisk čia, kad pritaikytum šį testą
 # =========================
-TEST_TITLE = "SCL-90"          # rodoma antraštė / PDF pavadinimas / el. laiško tema
-QUESTIONS_FILENAME = "Klausimai.txt"  # klausimų failo pavadinimas repo šaknyje
-KEYS_FILENAME = "Raktai.json"         # raktų failo pavadinimas repo šaknyje
-WORKSHEET_NAME = "Progresas"          # Google Sheets lapo (tab) pavadinimas šiam testui
+TEST_TITLE = "SCL-90"                  # rodoma antraštė / PDF pavadinimas / el. laiško tema
+QUESTIONS_FILENAME = "klausimai.txt"   # klausimų failo pavadinimas repo šaknyje
+KEYS_FILENAME = "raktai.json"          # raktų failo pavadinimas repo šaknyje
+INSTRUCTIONS_FILENAME = "instrukcijos.txt"  # tekstas, rodomas prieš pradedant testą (neprivalomas)
+WORKSHEET_NAME = "Progresas"           # Google Sheets lapo (tab) pavadinimas šiam testui
+
+# Atsakymų skalė (naudojama kaip slankiklis testo puslapyje)
+# Sąrašo indeksas (0-4) yra balas, naudojamas calculate_scores() funkcijoje.
+SCALE_LABELS = ["Visiškai ne", "Šiek tiek", "Vidutiniškai", "Gana daug", "Labai stipriai"]
+
+QUESTION_HEADER = "Kiek jus vargino:"  # antraštė, rodoma virš kiekvieno klausimo
 
 # Jei kada nors abu testai naudotų TĄ PATĮ Google Sheet dokumentą, čia reikėtų
 # skirtingo WORKSHEET_NAME kiekvienam testui. Kadangi šiam testui kuriamas
@@ -50,6 +57,10 @@ WORKSHEET_NAME = "Progresas"          # Google Sheets lapo (tab) pavadinimas ši
 st.set_page_config(layout="wide")
 st.markdown("""
 <style>
+html, body, .stApp {
+    background-color: #14171c !important;
+    color: #f2f2f2 !important;
+}
 #MainMenu {visibility: hidden;}
 header {visibility: hidden;}
 footer {visibility: hidden;}
@@ -58,14 +69,22 @@ footer {visibility: hidden;}
     max-width: 100%;
 }
 html, body { font-size: 34px; }
-h1 { font-size: 80px !important; }
+h1 { font-size: 80px !important; color: #f2f2f2 !important; }
+.question-header {
+    font-size: 32px !important;
+    font-weight: 400;
+    color: #b8b8b8;
+    margin-bottom: 10px;
+}
 .question-text {
     font-size: 50px !important;
     font-weight: 700;
     margin-bottom: 25px;
+    color: #ffffff !important;
 }
 div[role="radiogroup"] label {
     font-size: 50px !important;
+    color: #f2f2f2 !important;
 }
 input[type="radio"] {
     transform: scale(3);
@@ -158,6 +177,13 @@ def load_keys():
 
 QUESTIONS = load_questions()
 KEYS = load_keys()
+
+try:
+    INSTRUCTIONS_PATH = find_data_file(INSTRUCTIONS_FILENAME)
+    with open(INSTRUCTIONS_PATH, "r", encoding="utf-8") as f:
+        INSTRUCTIONS_TEXT = f.read()
+except FileNotFoundError:
+    INSTRUCTIONS_TEXT = None
 
 # =========================
 # GOOGLE SHEETS (PROGRESO SAUGOJIMAS)
@@ -275,23 +301,53 @@ for key, default in [
 # =========================
 # SCORING
 # =========================
-def normalize(ans):
-    if ans == "Sutinku":
-        return "T"
-    if ans == "Nesutinku":
-        return "K"
-    return None
-
-
 def calculate_scores(answers):
-    scores = {k: 0 for k in KEYS.keys()}
-    for q_idx, ans in answers.items():
-        ans = normalize(ans)
-        if not ans:
-            continue
-        for scale, items in KEYS.items():
-            if str(q_idx) in items and items[str(q_idx)] == ans:
-                scores[scale] += 1
+    """SCL-90-R tipo balų skaičiavimas pagal raktai.json struktūrą:
+    - KEYS["scales"][kodas] = {"name", "items": [...], "subtract": dalinys}
+        -> skalės balas = (atsakymų suma tų items) / subtract  (vidurkis)
+    - KEYS["total"] = {"items": [1..90], "subtract": 90} -> bendra suma / 90 = GSI
+    - KEYS["derived_scores"]: GSI, PST (kiek items > 0), PSDI (suma / PST)
+    - KEYS["reverse_items"]: klausimų numeriai, kurių balas apverčiamas
+      (output_max - reikšmė), taikoma prieš sumuojant
+    """
+    output_range = KEYS.get("output_range", [0, 4])
+    output_max = output_range[1]
+    reverse_set = {str(x) for x in KEYS.get("reverse_items", [])}
+
+    def get_value(item_id):
+        key = str(item_id)
+        val = answers.get(key)
+        if val is None:
+            return 0
+        val = int(val)
+        if key in reverse_set:
+            val = output_max - val
+        return val
+
+    scores = {}
+
+    # Devynios klinikinės skalės
+    for scale_def in KEYS.get("scales", {}).values():
+        items = scale_def.get("items", [])
+        divisor = scale_def.get("subtract") or len(items) or 1
+        raw_sum = sum(get_value(q) for q in items)
+        label = scale_def.get("name", "Skalė")
+        scores[label] = round(raw_sum / divisor, 2)
+
+    # Bendras balas (visi 90 klausimų) — naudojamas GSI/PST/PSDI
+    total_def = KEYS.get("total", {})
+    total_items = total_def.get("items", [])
+    total_divisor = total_def.get("subtract") or len(total_items) or 1
+    total_sum = sum(get_value(q) for q in total_items)
+
+    gsi = (total_sum / total_divisor) if total_divisor else 0
+    pst = sum(1 for q in total_items if get_value(q) > 0)
+    psdi = (total_sum / pst) if pst else 0
+
+    scores["Bendras sunkumo indeksas (GSI)"] = round(gsi, 2)
+    scores["Teigiamų simptomų kiekis (PST)"] = pst
+    scores["Simptomų distreso indeksas (PSDI)"] = round(psdi, 2)
+
     return scores
 
 
@@ -352,7 +408,7 @@ if st.session_state.page == "start":
                 else:
                     st.warning("Įveskite teisingą el. pašto adresą")
     else:
-        if st.button("Pradėti"):
+        if st.button("Kitas"):
             if not (name.strip() and surname.strip()):
                 st.warning("Įveskite vardą ir pavardę")
             elif not is_valid_email(email):
@@ -364,7 +420,7 @@ if st.session_state.page == "start":
                 st.session_state.test_id = make_test_id(name, surname)
                 st.session_state.answers = {}
                 st.session_state.q_index = 0
-                st.session_state.page = "test"
+                st.session_state.page = "instrukcijos"
                 try:
                     save_progress(
                         st.session_state.test_id, st.session_state.name,
@@ -377,17 +433,39 @@ if st.session_state.page == "start":
                 st.rerun()
 
 # =========================
+# INSTRUKCIJOS (rodoma pacientui prieš pradedant klausimus)
+# =========================
+elif st.session_state.page == "instrukcijos":
+    st.title("Instrukcijos")
+
+    # Čia gali įdėti paveikslėlį arba trumpą vaizdo įrašą vietoje/šalia teksto:
+    #   st.image("instrukcijos.png")               -- vietinis failas repo šaknyje
+    #   st.image("https://.../paveikslelis.png")    -- nuoroda
+    #   st.video("instrukcijos.mp4")                -- vietinis vaizdo failas
+    #   st.video("https://youtu.be/...")             -- YouTube ar kita nuoroda
+    if INSTRUCTIONS_TEXT:
+        st.markdown(INSTRUCTIONS_TEXT.replace("\n", "  \n"))
+    else:
+        st.info("Instrukcijų tekstas nerastas (instrukcijos.txt).")
+
+    if st.button("Pradėti testą"):
+        st.session_state.page = "test"
+        st.rerun()
+
+# =========================
 # TEST
 # =========================
 elif st.session_state.page == "test":
     i = st.session_state.q_index
     total = len(QUESTIONS)
     st.progress(i / total)
+    st.markdown(f"<div class='question-header'>{QUESTION_HEADER}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='question-text'>{i+1}. {QUESTIONS[i]}</div>", unsafe_allow_html=True)
 
     current = st.session_state.answers.get(str(i + 1))
-    index = 0 if current == "Sutinku" else 1 if current == "Nesutinku" else None
-    ans = st.radio(" ", ["Sutinku", "Nesutinku"], index=index, key=f"q_{i}")
+    index = current if isinstance(current, int) and 0 <= current < len(SCALE_LABELS) else None
+    selected_label = st.radio(" ", SCALE_LABELS, index=index, key=f"q_{i}")
+    ans = SCALE_LABELS.index(selected_label) if selected_label is not None else None
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -466,6 +544,22 @@ elif st.session_state.page == "finish":
     surname = st.session_state.surname
     email = st.session_state.email
 
+    # Apsauga nuo pakartotinio siuntimo: jei šioje sesijoje jau siųsta,
+    # arba Google Sheets jau pažymėta "baigta" (pvz. po naršyklės atnaujinimo,
+    # kuris sukuria naują sesiją, bet Sheets įrašas išlieka), nebekartojam.
+    already_done = st.session_state.get("email_sent", False)
+    if not already_done:
+        try:
+            _, existing = find_progress(st.session_state.test_id)
+            if existing and existing.get("statusas") == "baigta":
+                already_done = True
+        except Exception:
+            pass  # jei Sheets nepasiekiamas, tęsiam įprastai (geriau parodyti nei blokuoti)
+
+    if already_done:
+        st.success("Testas baigtas, ačiū už atsakymus.")
+        st.stop()
+
     scores = calculate_scores(st.session_state.answers)
 
     # EXCEL
@@ -506,8 +600,8 @@ elif st.session_state.page == "finish":
             st.session_state.test_id, name, surname, email,
             st.session_state.q_index, st.session_state.answers, statusas="baigta"
         )
-    except Exception as e:
-        st.warning(f"Nepavyko pažymėti testo kaip baigto Google Sheets: {e}")
+    except Exception:
+        pass  # klaidos pacientui nerodomos
 
     st.success("Testas baigtas, ačiū už atsakymus.")
 
@@ -517,25 +611,8 @@ elif st.session_state.page == "finish":
                 email, name, surname,
                 pdf_buffer.getvalue(), excel_buffer.getvalue()
             )
-            st.success(f"Ataskaita automatiškai išsiųsta į {email}")
-        except Exception as e:
-            st.error(f"Nepavyko išsiųsti el. laiško automatiškai: {e}")
+        except Exception:
+            pass  # klaidos pacientui nerodomos; jei reikia, žr. Google Sheets "statusas" stulpelį
 
-    pdf_buffer.seek(0)
-    excel_buffer.seek(0)
-
-    st.markdown("### Taip pat galite atsisiųsti rezultatus čia")
-    col1, col2 = st.columns(2)
-    filename_base = f"{name}_{surname}_{now_vilnius().strftime('%Y%m%d_%H%M%S')}"
-    with col1:
-        st.download_button(
-            "Atsisiųsti PDF ataskaitą", data=pdf_buffer,
-            file_name=f"{filename_base}_ataskaita.pdf", mime="application/pdf",
-        )
-    with col2:
-        st.download_button(
-            "Atsisiųsti Excel atsakymus", data=excel_buffer,
-            file_name=f"{filename_base}_atsakymai.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+    st.session_state.email_sent = True
     st.stop()
