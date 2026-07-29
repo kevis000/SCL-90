@@ -563,11 +563,24 @@ elif st.session_state.page == "finish":
     scores = calculate_scores(st.session_state.answers)
 
     # EXCEL
+    excel_rows = []
+    for key in sorted(st.session_state.answers.keys(), key=lambda k: int(k)):
+        q_num = int(key)
+        answer_idx = st.session_state.answers[key]
+        question_text = QUESTIONS[q_num - 1] if 0 <= q_num - 1 < len(QUESTIONS) else ""
+        answer_label = (
+            SCALE_LABELS[answer_idx]
+            if isinstance(answer_idx, int) and 0 <= answer_idx < len(SCALE_LABELS)
+            else answer_idx
+        )
+        excel_rows.append({
+            "Nr.": q_num,
+            "Klausimas": question_text,
+            "Atsakymas": answer_label,
+        })
+
     excel_buffer = io.BytesIO()
-    pd.DataFrame(
-        list(st.session_state.answers.items()),
-        columns=["Klausimas", "Atsakymas"]
-    ).to_excel(excel_buffer, index=False, engine="openpyxl")
+    pd.DataFrame(excel_rows).to_excel(excel_buffer, index=False, engine="openpyxl")
     excel_buffer.seek(0)
 
     # PDF
