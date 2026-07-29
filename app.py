@@ -587,7 +587,7 @@ elif st.session_state.page == "finish":
 
     scores = calculate_scores(st.session_state.answers)
 
-    # EXCEL — dabar su klausimo tekstu ir žmogui suprantama atsakymo etikete
+    # EXCEL — su fiksuotu pločiu ir teksto laužymu, kad klausimas matytųsi pilnas
     excel_rows = []
     for key in sorted(st.session_state.answers.keys(), key=lambda k: int(k)):
         q_num = int(key)
@@ -604,8 +604,31 @@ elif st.session_state.page == "finish":
             "Atsakymas": answer_label,
         })
 
+    from openpyxl.styles import Alignment
+
     excel_buffer = io.BytesIO()
-    pd.DataFrame(excel_rows).to_excel(excel_buffer, index=False, engine="openpyxl")
+    df = pd.DataFrame(excel_rows)
+    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Atsakymai")
+        worksheet = writer.sheets["Atsakymai"]
+
+        # Fiksuoti stulpelių pločiai: Nr. siauras, Klausimas platus, Atsakymas vidutinis
+        worksheet.column_dimensions["A"].width = 6
+        worksheet.column_dimensions["B"].width = 70
+        worksheet.column_dimensions["C"].width = 20
+
+        wrap_alignment = Alignment(wrap_text=True, vertical="top")
+        for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row):
+            for cell in row:
+                cell.alignment = wrap_alignment
+
+        # Eilutės aukštis priderinamas pagal klausimo ilgį, kad visas tekstas matytųsi be tempimo
+        for row_idx in range(2, worksheet.max_row + 1):
+            question_cell = worksheet.cell(row=row_idx, column=2)
+            text_len = len(str(question_cell.value or ""))
+            lines_needed = max(1, -(-text_len // 65))
+            worksheet.row_dimensions[row_idx].height = 15 * lines_needed
+
     excel_buffer.seek(0)
 
     # PDF
