@@ -65,63 +65,55 @@ html, body, .stApp {
 header {visibility: hidden;}
 footer {visibility: hidden;}
 .block-container {
-    padding: 2rem;
+    padding: 1rem 1.2rem;
     max-width: 100%;
 }
-html, body { font-size: 34px; }
-h1 { font-size: 80px !important; color: #f2f2f2 !important; }
+html, body { font-size: clamp(16px, 3vw, 34px); }
+h1 { font-size: clamp(28px, 6vw, 80px) !important; color: #f2f2f2 !important; }
+
+.question-box {
+    background: #1c2029;
+    border: 1px solid #2e333d;
+    border-radius: 14px;
+    padding: clamp(12px, 4vw, 24px);
+    margin-bottom: 20px;
+    height: auto;
+    overflow: visible;
+}
 .question-header {
-    font-size: 32px !important;
+    font-size: clamp(14px, 3.5vw, 32px) !important;
     font-weight: 400;
     color: #b8b8b8;
     margin-bottom: 10px;
 }
 .question-text {
-    font-size: 50px !important;
+    font-size: clamp(20px, 6vw, 50px) !important;
     font-weight: 700;
-    margin-bottom: 25px;
+    margin-bottom: 0;
     color: #ffffff !important;
+    line-height: 1.3;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    height: auto;
 }
 div[role="radiogroup"] label {
-    font-size: 50px !important;
+    font-size: clamp(18px, 4vw, 50px) !important;
     color: #f2f2f2 !important;
+    white-space: normal;
+    line-height: 1.4;
 }
 input[type="radio"] {
-    transform: scale(3);
-    margin-right: 15px;
+    transform: scale(2);
+    margin-right: 12px;
 }
 div.stButton > button {
-    font-size: 28px !important;
-    height: 65px !important;
+    font-size: clamp(16px, 3.5vw, 28px) !important;
+    height: auto;
+    min-height: 50px;
     width: 100%;
-    @media (max-width: 600px) {
-    html, body { font-size: 18px; }
-    h1 { font-size: 32px !important; }
-    .question-header {
-        font-size: 18px !important;
-        margin-bottom: 6px;
-    }
-    .question-text {
-        font-size: 24px !important;
-        margin-bottom: 15px;
-        line-height: 1.3;
-    }
-    div[role="radiogroup"] label {
-        font-size: 22px !important;
-        line-height: 1.4;
-    }
-    input[type="radio"] {
-        transform: scale(2);
-        margin-right: 10px;
-    }
-    div.stButton > button {
-        font-size: 18px !important;
-        height: 50px !important;
-    }
-    .block-container {
-        padding: 1rem !important;
-    }
-
+    padding: 10px;
+    white-space: normal;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -487,8 +479,13 @@ elif st.session_state.page == "test":
     i = st.session_state.q_index
     total = len(QUESTIONS)
     st.progress(i / total)
-    st.markdown(f"<div class='question-header'>{QUESTION_HEADER}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='question-text'>{i+1}. {QUESTIONS[i]}</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div class='question-box'>"
+        f"<div class='question-header'>{QUESTION_HEADER}</div>"
+        f"<div class='question-text'>{i+1}. {QUESTIONS[i]}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
     current = st.session_state.answers.get(str(i + 1))
     index = current if isinstance(current, int) and 0 <= current < len(SCALE_LABELS) else None
@@ -590,7 +587,7 @@ elif st.session_state.page == "finish":
 
     scores = calculate_scores(st.session_state.answers)
 
-    # EXCEL
+    # EXCEL — dabar su klausimo tekstu ir žmogui suprantama atsakymo etikete
     excel_rows = []
     for key in sorted(st.session_state.answers.keys(), key=lambda k: int(k)):
         q_num = int(key)
