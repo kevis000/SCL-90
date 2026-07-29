@@ -94,6 +94,34 @@ div.stButton > button {
     font-size: 28px !important;
     height: 65px !important;
     width: 100%;
+    @media (max-width: 600px) {
+    html, body { font-size: 18px; }
+    h1 { font-size: 32px !important; }
+    .question-header {
+        font-size: 18px !important;
+        margin-bottom: 6px;
+    }
+    .question-text {
+        font-size: 24px !important;
+        margin-bottom: 15px;
+        line-height: 1.3;
+    }
+    div[role="radiogroup"] label {
+        font-size: 22px !important;
+        line-height: 1.4;
+    }
+    input[type="radio"] {
+        transform: scale(2);
+        margin-right: 10px;
+    }
+    div.stButton > button {
+        font-size: 18px !important;
+        height: 50px !important;
+    }
+    .block-container {
+        padding: 1rem !important;
+    }
+
 }
 </style>
 """, unsafe_allow_html=True)
